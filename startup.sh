@@ -6,32 +6,35 @@ if [ -d "/pnpm" ] && [ -x "/pnpm/pnpm" ]; then
   case ":$PATH:" in
     *:"/pnpm":*) ;; # Already in PATH, do nothing
     *)
-      echo "Found executable pnpm in /pnpm. Adding to PATH."
+      printf "Found executable pnpm in /pnpm. Adding to PATH.\n"
       export PATH="/pnpm:$PATH"
       ;;
   esac
 fi
 
-# Try to find pnpm via npm's global bin if not found in PATH from Docker ENV or the /pnpm check above
+# Try to find pnpm via npm's global installation path if not found in PATH from Docker ENV or the /pnpm check above
 if ! command -v pnpm >/dev/null 2>&1; then
-  echo "pnpm not found in PATH yet. Attempting to find via 'npm bin -g'..."
+  printf "pnpm not found in PATH initially. Attempting to find npm global bin directory...\n"
   if command -v npm >/dev/null 2>&1; then
-    NPM_GLOBAL_BIN_PATH=$(npm bin -g)
-    # Check if 'npm bin -g' succeeded and returned a non-empty path, and if pnpm is executable there
-    if [ -n "$NPM_GLOBAL_BIN_PATH" ] && [ -d "$NPM_GLOBAL_BIN_PATH" ] && [ -x "$NPM_GLOBAL_BIN_PATH/pnpm" ]; then
+    # Use 'npm bin -g' which directly gives the global bin path.
+    # Suppress stderr from 'npm bin -g' and use '|| true' to prevent script exit if 'set -e' is active and command fails.
+    NPM_GLOBAL_BIN_PATH_RAW=$(npm bin -g 2>/dev/null || true)
+
+    if [ -n "$NPM_GLOBAL_BIN_PATH_RAW" ] && [ -d "$NPM_GLOBAL_BIN_PATH_RAW" ] && [ -x "$NPM_GLOBAL_BIN_PATH_RAW/pnpm" ]; then
+      NPM_GLOBAL_BIN_PATH="$NPM_GLOBAL_BIN_PATH_RAW"
       # Check if the path is already in PATH to avoid duplicates
       case ":$PATH:" in
         *:"$NPM_GLOBAL_BIN_PATH":*) ;; # Already in PATH, do nothing
         *) 
-          echo "Found pnpm in '$NPM_GLOBAL_BIN_PATH'. Adding to PATH."
+          printf "Found pnpm in '%s'. Adding to PATH.\n" "$NPM_GLOBAL_BIN_PATH"
           export PATH="$NPM_GLOBAL_BIN_PATH:$PATH"
           ;;
       esac
     else
-      echo "pnpm not found in npm global bin path '$NPM_GLOBAL_BIN_PATH', or path is not a directory, or pnpm is not executable there, or 'npm bin -g' command failed."
+      printf "pnpm not found in npm global bin directory (derived from 'npm bin -g', which outputted: '%s'). The path might be invalid, not a directory, pnpm might not be executable there, or 'npm bin -g' itself might have failed if its output was empty.\n" "$NPM_GLOBAL_BIN_PATH_RAW" >&2
     fi
   else
-    echo "npm command not found. Cannot locate pnpm via 'npm bin -g'."
+    printf "npm command not found. Cannot locate pnpm via 'npm bin -g'.\n" >&2
   fi
 fi
 
@@ -44,14 +47,14 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MONOREPO_ROOT="$SCRIPT_DIR"
 
-echo "Starting application setup (via startup.sh from $MONOREPO_ROOT)..."
+printf "Starting application setup (via startup.sh from %s)...\n" "$MONOREPO_ROOT"
 
 # Check if pnpm is installed and in PATH (relevant for the environment running this script)
 if ! command -v pnpm >/dev/null 2>&1; then
-  echo "Error: pnpm is not installed or not found in your PATH for startup.sh (even after attempting to find it)." >&2
-  echo "Current PATH: $PATH" >&2
-  echo "Please install pnpm to continue if running this script outside Docker builds." >&2
-  echo "Visit https://pnpm.io/installation for instructions." >&2
+  printf "Error: pnpm is not installed or not found in your PATH for startup.sh (even after attempting to find it).\n" >&2
+  printf "Current PATH: %s\n" "$PATH" >&2
+  printf "Please install pnpm to continue if running this script outside Docker builds.\n" >&2
+  printf "Visit https://pnpm.io/installation for instructions.\n" >&2
   exit 1
 fi
 
@@ -59,26 +62,26 @@ fi
 # In a Docker-centric workflow with Dockerfiles handling builds, these are typically handled there.
 # This section is useful if running this script to build on the host, e.g., before `docker-compose up` (without --build).
 if [ "${SKIP_BUILDS_IN_STARTUP_SH}" != "true" ]; then
-  echo "Building Web application (via startup.sh)..."
+  printf "Building Web application (via startup.sh)...\n"
   (cd "$MONOREPO_ROOT" && pnpm --filter web build)
 
-  echo "Building API application (via startup.sh)..."
+  printf "Building API application (via startup.sh)...\n"
   (cd "$MONOREPO_ROOT" && pnpm --filter api build)
 else
-  echo "Skipping build steps in startup.sh as SKIP_BUILDS_IN_STARTUP_SH is true."
+  printf "Skipping build steps in startup.sh as SKIP_BUILDS_IN_STARTUP_SH is true.\n"
 fi
 
 # Start the API server
 # This part is specific to running the API directly using this script.
 # Docker containers will typically use their own CMD (e.g., `pnpm start` or `pnpm dev` from package.json).
-echo "Starting API server (via startup.sh)..."
+printf "Starting API server (via startup.sh)...\n"
 
 # Change to the API's directory to run the server
 # This is important if the server expects to be run from its own directory (e.g., for relative paths to assets or config)
 API_DIR="$MONOREPO_ROOT/apps/api"
 
 if [ ! -d "$API_DIR" ]; then
-    echo "Error: API directory '$API_DIR' not found." >&2
+    printf "Error: API directory '%s' not found.\n" "$API_DIR" >&2
     exit 1
 fi
 
@@ -90,9 +93,9 @@ cd "$API_DIR"
 # Check if dist/server.js exists before trying to execute it
 # This is crucial if builds were skipped or failed.
 if [ ! -f "dist/server.js" ]; then
-    echo "Error: API build artifact 'dist/server.js' not found in '$API_DIR'." >&2
-    echo "Please ensure the API is built correctly." >&2
-    echo "You might need to run 'pnpm --filter api build' from '$MONOREPO_ROOT', or ensure SKIP_BUILDS_IN_STARTUP_SH is not set to true." >&2
+    printf "Error: API build artifact 'dist/server.js' not found in '%s'.\n" "$API_DIR" >&2
+    printf "Please ensure the API is built correctly.\n" >&2
+    printf "You might need to run 'pnpm --filter api build' from '%s', or ensure SKIP_BUILDS_IN_STARTUP_SH is not set to true.\n" "$MONOREPO_ROOT" >&2
     exit 1
 fi
 

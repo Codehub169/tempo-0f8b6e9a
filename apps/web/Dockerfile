@@ -1,8 +1,7 @@
 # Base stage with Node.js and pnpm, and a non-root user
 FROM node:18-alpine AS base
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
 # Install specific pnpm version matching package.json
+# npm install -g pnpm will install pnpm to a standard global location (e.g., /usr/local/bin) which is typically already in PATH.
 RUN npm install -g pnpm@8.6.0
 
 # Create a non-root user 'node' and group 'node'
@@ -41,13 +40,14 @@ ENV NODE_ENV production
 
 # Copy deployed Web application (pruned with production dependencies for 'next start')
 # The content of /app/prod_deploy_web will be copied into /app in the runner stage.
-# This means apps/web/.next will be at /app/apps/web/.next, etc.
+# This means apps/web/.next will be at /app/apps/web/.next, etc. and node_modules at /app/node_modules.
 COPY --chown=node:node --from=builder /app/prod_deploy_web .
 
 # Set user to non-root 'node' user
 USER node
 
 # Set working directory for the Web application for the CMD instruction
+# This is /app/apps/web, where the web's package.json is located after the COPY from prod_deploy_web.
 WORKDIR /app/apps/web
 
 EXPOSE 3000
