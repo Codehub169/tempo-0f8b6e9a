@@ -2,7 +2,8 @@
 FROM node:18-alpine AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN npm install -g pnpm
+# Install specific pnpm version matching package.json
+RUN npm install -g pnpm@8.6.0
 
 # Create a non-root user 'node' and group 'node'
 RUN addgroup -S node && adduser -S node -G node
@@ -29,7 +30,7 @@ RUN pnpm --filter web build
 
 # Prepare production deployment for Web (for running with 'next start')
 # This will create a pruned package in /app/prod_deploy_web
-# including apps/web/.next, apps/web/package.json, and necessary node_modules for 'next start'.
+# including apps/web/.next, apps/web/public, apps/web/package.json, and necessary node_modules for 'next start'.
 RUN pnpm deploy --filter web --prod /app/prod_deploy_web
 
 # Production image for Next.js (if serving with Next.js server using 'next start')

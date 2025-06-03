@@ -2,7 +2,8 @@
 FROM node:18-alpine AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN npm install -g pnpm
+# Install specific pnpm version matching package.json
+RUN npm install -g pnpm@8.6.0
 
 # Create a non-root user 'node' and group 'node'
 RUN addgroup -S node && adduser -S node -G node
@@ -52,8 +53,6 @@ COPY --chown=node:node --from=builder /app/apps/web/out ./apps/web/out
 
 # Copy Prisma schema for runtime if not included by 'pnpm deploy'
 # This is a safeguard. Ideally, 'apps/api/package.json' should list 'src/prisma' in its 'files' field.
-# The path ./apps/api/src/prisma assumes that 'pnpm deploy' correctly placed the api app under /app/apps/api/ within the prod_deploy_api folder.
-# If 'prod_deploy_api' contains the 'apps/api' structure, then this copy is fine. 
 # Given `COPY --from=builder /app/prod_deploy_api .`, `apps/api/src/prisma` from builder should be copied to `/app/apps/api/src/prisma`
 COPY --chown=node:node --from=builder /app/apps/api/src/prisma ./apps/api/src/prisma
 

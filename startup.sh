@@ -1,5 +1,10 @@
 #!/bin/sh
 
+# Ensure /pnpm is in PATH if it exists (common in our Docker setup)
+if [ -d "/pnpm" ] && ! echo "$PATH" | grep -q "/pnpm"; then
+  export PATH="/pnpm:$PATH"
+fi
+
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
@@ -37,7 +42,7 @@ fi
 # Start the API server
 # This part is specific to running the API directly.
 # Docker containers will use their own CMD (e.g., `pnpm start` or `pnpm dev` from package.json)
-echo "Starting API server on port 9000 (via startup.sh)..."
+echo "Starting API server (via startup.sh)..."
 
 # Change to the API's directory to run the server
 # This is important if the server expects to be run from its own directory (e.g., for relative paths to assets or config)
@@ -50,7 +55,8 @@ fi
 
 cd "$API_DIR"
 
-export PORT=9000 # This script's convention for the API port
+# PORT will be inherited from the environment (e.g., docker-compose.yml or Dockerfile ENV).
+# The server.ts defaults to 3001 if process.env.PORT is not set.
 
 # Check if dist/server.js exists before trying to execute it
 if [ ! -f "dist/server.js" ]; then
