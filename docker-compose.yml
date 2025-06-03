@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./apps/api:/usr/src/app
+      - /usr/src/app/node_modules # Don't mount node_modules from host
+    environment:
+      - NODE_ENV=development
+      # Since SQLite is used, DATABASE_URL will likely be a file path
+      # and managed within the API's Dockerfile or entrypoint, 
+      # or via its .env file for local dev.
+      # Example: DATABASE_URL=file:./dev.db
+    depends_on:
+      - web # Ensures web service is aware of api, though not strictly needed for startup order here
+    networks:
+      - ecom_network
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "9000:3000" # Expose Next.js default port 3000 on host port 9000
+    volumes:
+      - ./apps/web:/usr/src/app
+      - /usr/src/app/node_modules
+      - /usr/src/app/.next
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://api:3001 # Internal Docker network URL
+    depends_on:
+      - api
+    networks:
+      - ecom_network
+
+networks:
+  ecom_network:
+    driver: bridge

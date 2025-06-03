@@ -1,0 +1,21 @@
+{
+  "name": "ecommerce-monorepo",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter ./apps/* --parallel dev",
+    "build": "pnpm --filter ./apps/* --parallel build",
+    "start": "pnpm --filter ./apps/* --parallel start",
+    "lint": "pnpm --filter ./apps/* --parallel lint",
+    "test": "pnpm --filter ./apps/* --parallel test"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "turbo": "^1.10.0",
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.6.0"
+}

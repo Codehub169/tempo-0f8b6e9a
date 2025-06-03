@@ -1,0 +1,1 @@
+Please download an image to be used as a general placeholder and save it to `apps/web/public/placeholder.jpg`. You can use this URL for a suitable image: https://picsum.photos/800/600?random=cfcd208495. The frontend code will reference this image as `/placeholder.jpg`.
