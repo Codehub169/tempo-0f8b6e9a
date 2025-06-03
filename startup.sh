@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Exit immediately if a command exits with a non-zero status.
+# We'll set it later, after initial PATH setup that might use '|| true'.
+
 # Ensure /pnpm is in PATH if it exists (common in our Docker setup) and contains an executable pnpm
 if [ -d "/pnpm" ] && [ -x "/pnpm/pnpm" ]; then
   # Check if /pnpm is already in PATH using a robust method
@@ -12,28 +15,28 @@ if [ -d "/pnpm" ] && [ -x "/pnpm/pnpm" ]; then
   esac
 fi
 
-# Try to find pnpm via npm's global installation path if not found in PATH from Docker ENV or the /pnpm check above
+# Try to find pnpm via npm's global installation path if not found yet.
 if ! command -v pnpm >/dev/null 2>&1; then
-  printf "pnpm not found in PATH initially. Attempting to find npm global bin directory...\n"
+  printf "pnpm not found in PATH after initial checks. Attempting to find via npm global bin directory...\n"
   if command -v npm >/dev/null 2>&1; then
     # Use 'npm bin -g' which directly gives the global bin path.
     # Suppress stderr from 'npm bin -g' and use '|| true' to prevent script exit if 'set -e' is active and command fails.
     NPM_GLOBAL_BIN_PATH_RAW=$(npm bin -g 2>/dev/null || true)
 
+    # Check if the path obtained is non-empty, is a directory, and pnpm is executable there.
     if [ -n "$NPM_GLOBAL_BIN_PATH_RAW" ] && [ -d "$NPM_GLOBAL_BIN_PATH_RAW" ] && [ -x "$NPM_GLOBAL_BIN_PATH_RAW/pnpm" ]; then
-      NPM_GLOBAL_BIN_PATH="$NPM_GLOBAL_BIN_PATH_RAW"
       # Check if the path is already in PATH to avoid duplicates
       case ":$PATH:" in
-        *:"$NPM_GLOBAL_BIN_PATH":*) ;; # Already in PATH, do nothing
-        *) 
-          printf "Found pnpm in '%s' (derived from npm bin -g). Adding to PATH.\n" "$NPM_GLOBAL_BIN_PATH"
-          export PATH="$NPM_GLOBAL_BIN_PATH:$PATH"
+        *:"$NPM_GLOBAL_BIN_PATH_RAW":*) ;; # Already in PATH, do nothing
+        *)
+          printf "Found pnpm in npm global bin directory '%s' (derived from npm bin -g). Adding to PATH.\n" "$NPM_GLOBAL_BIN_PATH_RAW"
+          export PATH="$NPM_GLOBAL_BIN_PATH_RAW:$PATH"
           ;;
       esac
     else
-      # This message covers cases where NPM_GLOBAL_BIN_PATH_RAW might be empty (if 'npm bin -g' failed) 
-      # or if the path is invalid, or pnpm not executable there.
-      printf "pnpm not found in npm global bin directory (derived from 'npm bin -g', which outputted: '%s'). The path might be invalid, not a directory, pnpm might not be executable there, or 'npm bin -g' itself might have failed if its output was empty.\n" "$NPM_GLOBAL_BIN_PATH_RAW" >&2
+      # This message covers cases where NPM_GLOBAL_BIN_PATH_RAW might be empty (if 'npm bin -g' command failed or outputted nothing),
+      # or if the path is not a directory, or pnpm is not executable there.
+      printf "pnpm not found in the npm global bin directory. 'npm bin -g' outputted: '%s'. This path might be invalid, pnpm might not be executable there, or npm itself might have issues.\n" "$NPM_GLOBAL_BIN_PATH_RAW" >&2
     fi
   else
     printf "npm command not found. Cannot locate pnpm via 'npm bin -g'.\n" >&2
@@ -58,6 +61,8 @@ if ! command -v pnpm >/dev/null 2>&1; then
   printf "Please install pnpm to continue if running this script outside Docker builds.\n" >&2
   printf "Visit https://pnpm.io/installation for instructions.\n" >&2
   exit 1
+else
+  printf "pnpm successfully found in PATH: $(command -v pnpm)\n"
 fi
 
 # The following build commands are for when startup.sh is responsible for builds.
