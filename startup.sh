@@ -5,6 +5,13 @@ set -e
 
 echo "Starting application setup..."
 
+# Check if pnpm is installed
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "Error: pnpm is not installed or not in your PATH." >&2
+  echo "Please install pnpm to continue. Visit https://pnpm.io/installation for instructions." >&2
+  exit 1
+fi
+
 # 1. Build the Web application (generates static files in apps/web/out)
 echo "Building Web application..."
 pnpm --filter web build
