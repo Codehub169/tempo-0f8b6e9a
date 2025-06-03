@@ -26,11 +26,13 @@ if ! command -v pnpm >/dev/null 2>&1; then
       case ":$PATH:" in
         *:"$NPM_GLOBAL_BIN_PATH":*) ;; # Already in PATH, do nothing
         *) 
-          printf "Found pnpm in '%s'. Adding to PATH.\n" "$NPM_GLOBAL_BIN_PATH"
+          printf "Found pnpm in '%s' (derived from npm bin -g). Adding to PATH.\n" "$NPM_GLOBAL_BIN_PATH"
           export PATH="$NPM_GLOBAL_BIN_PATH:$PATH"
           ;;
       esac
     else
+      # This message covers cases where NPM_GLOBAL_BIN_PATH_RAW might be empty (if 'npm bin -g' failed) 
+      # or if the path is invalid, or pnpm not executable there.
       printf "pnpm not found in npm global bin directory (derived from 'npm bin -g', which outputted: '%s'). The path might be invalid, not a directory, pnpm might not be executable there, or 'npm bin -g' itself might have failed if its output was empty.\n" "$NPM_GLOBAL_BIN_PATH_RAW" >&2
     fi
   else
