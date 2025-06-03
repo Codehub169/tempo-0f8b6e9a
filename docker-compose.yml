@@ -3,39 +3,63 @@ version: '3.8'
 services:
   api:
     build:
-      context: ./apps/api
-      dockerfile: Dockerfile
+      context: . # Build from monorepo root
+      dockerfile: apps/api/Dockerfile
     ports:
       - "3001:3001"
     volumes:
-      - ./apps/api:/usr/src/app
-      - /usr/src/app/node_modules # Don't mount node_modules from host
+      # Mount necessary source code for development, including shared packages
+      - ./apps/api:/app/apps/api # Mount api source code
+      - ./packages:/app/packages # Mount shared packages source code
+      # For development, if API serves static files from web build, ensure web is built and `out` is accessible
+      # This volume makes host's apps/web/out available to the api container at /app/apps/web/out.
+      # The web service (next dev) or a manual host build (pnpm --filter web build) should populate ./apps/web/out on the host.
+      - ./apps/web/out:/app/apps/web/out 
+      # Anonymous volumes to prevent host node_modules from overwriting container's node_modules
+      - /app/node_modules # Workspace node_modules in container
+      - /app/apps/api/node_modules # api specific node_modules in container (if any outside workspace)
+      - /app/apps/web/node_modules # web specific node_modules in container (if any outside workspace)
+      - /app/packages/node_modules # packages specific node_modules in container (if any outside workspace)
     environment:
       - NODE_ENV=development
-      # Since SQLite is used, DATABASE_URL will likely be a file path
-      # and managed within the API's Dockerfile or entrypoint, 
-      # or via its .env file for local dev.
-      # Example: DATABASE_URL=file:./dev.db
-    depends_on:
-      - web # Ensures web service is aware of api, though not strictly needed for startup order here
+      - DATABASE_URL=${DATABASE_URL} # Ensure this is set in your .env file or environment
+      - PORT=3001
+    # For development, override CMD to run dev script with hot-reloading
+    command: pnpm --filter api dev # Use dev script from api's package.json
     networks:
       - ecom_network
+    # healthcheck: # Optional: Add healthcheck for API service
+    #   test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 30s
 
   web:
     build:
-      context: ./apps/web
-      dockerfile: Dockerfile
+      context: . # Build from monorepo root
+      dockerfile: apps/web/Dockerfile
     ports:
-      - "9000:3000" # Expose Next.js default port 3000 on host port 9000
+      - "9000:3000" # Expose Next.js default dev port 3000 on host port 9000
     volumes:
-      - ./apps/web:/usr/src/app
-      - /usr/src/app/node_modules
-      - /usr/src/app/.next
+      # Mount necessary source code for development
+      - ./apps/web:/app/apps/web # Mount web source code
+      - ./packages:/app/packages # Mount shared packages source code
+      # Anonymous volumes to prevent host node_modules from overwriting container's node_modules
+      # and persist .next folder for Next.js caching
+      - /app/node_modules # Workspace node_modules in container
+      - /app/apps/web/node_modules # web specific node_modules in container
+      - /app/apps/web/.next # Persist .next folder for caching
+      - /app/packages/node_modules # packages specific node_modules in container
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://api:3001 # Internal Docker network URL
+      - NEXT_PUBLIC_API_URL=http://api:3001 # Internal Docker network URL to API on its actual port
+      - PORT=3000 # Port Next.js dev server will run on inside the container
+    # For development, override CMD to run dev script with hot-reloading
+    command: pnpm --filter web dev # Use dev script from web's package.json
     depends_on:
-      - api
+      api: # Ensures api service is started, not necessarily healthy (use healthcheck for that)
+        condition: service_started # or service_healthy if healthcheck is defined on api
     networks:
       - ecom_network
 
